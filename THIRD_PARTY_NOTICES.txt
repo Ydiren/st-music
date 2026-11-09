@@ -1,0 +1,60 @@
+AtariAudio 1.30
+https://github.com/arnaud-carre/AtariAudio
+Pinned revision: 5fd4b46b1a2a8fa776f8f0f68f648ef70c03ef10
+
+MIT License
+
+Copyright (c) 2026 Arnaud Carré
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+Musashi Motorola 68000 emulation (included in AtariAudio)
+https://github.com/kstenerud/Musashi
+Thread-safe AtariAudio-specific modifications by Arnaud Carré.
+
+Copyright © 1998-2001 Karl Stenerud
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+Additional AtariAudio credits:
+- ICE 2.40 depacker: placed in the public domain in 2007 by Hans Wessels.
+- LZH depacker: original code by Haruhiko Okumura (1991) and
+  Kerwin F. Medina (1996), adapted by Arnaud Carré.
+- Duration database: Benjamin Gerard and the SNDH Community.
+- YM2149 mixing tables: measurements by Paulo Simoes on real hardware,
+  extended to a 32*32*32 table by Arnaud Carré.
+
+Music files are separate works. Engine licenses do not grant permission to
+redistribute the SNDH/YM collection or reference recording.

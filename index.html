@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="dark">
+    <meta name="theme-color" content="#111619">
+    <title>ST Music</title>
+    <link rel="stylesheet" href="./style.css">
+    <script type="module" src="./app.js"></script>
+  </head>
+  <body>
+    <main class="player" aria-labelledby="page-title">
+      <header class="page-header">
+        <p class="eyebrow">Atari ST / Music player</p>
+        <h1 id="page-title">ST Music<span class="title-dot" aria-hidden="true">.</span></h1>
+        <p class="intro">A small player for a distinctive sound.</p>
+      </header>
+
+      <section class="track-panel" aria-labelledby="track-heading">
+        <div class="panel-heading">
+          <h2 id="track-heading">Now loaded</h2>
+          <p id="status" class="status" role="status" aria-live="polite">No track loaded</p>
+        </div>
+        <h3 id="track-title" class="track-title">Your next listen</h3>
+        <p id="track-file" class="track-file">Choose a local file or try the reference track.</p>
+        <dl class="metadata">
+          <div><dt>Author</dt><dd id="track-author">—</dd></div>
+          <div><dt>Year</dt><dd id="track-year">—</dd></div>
+        </dl>
+
+        <div class="subtune-control">
+          <label for="subtune">Subtune</label>
+          <select id="subtune" aria-describedby="subtune-hint" disabled></select>
+          <p id="subtune-hint" class="hint">Switching restarts the chosen subtune. Stop keeps your selection.</p>
+        </div>
+
+        <div class="transport-row">
+          <div class="transport" role="group" aria-label="Playback controls">
+            <button id="play" class="button primary" type="button" disabled>Play</button>
+            <button id="pause" class="button" type="button" disabled>Pause</button>
+            <button id="stop" class="button" type="button" disabled>Stop</button>
+          </div>
+          <div class="elapsed"><span>Elapsed</span><output id="elapsed" aria-label="Elapsed time" aria-live="off">0:00</output></div>
+        </div>
+
+        <div class="volume-control">
+          <label for="volume">Volume</label>
+          <input id="volume" type="range" min="0" max="1" step="0.01" value="0.7" aria-describedby="volume-value">
+          <output id="volume-value" for="volume">70%</output>
+        </div>
+      </section>
+
+      <section class="source-panel" aria-labelledby="source-heading">
+        <h2 id="source-heading">Choose your music</h2>
+        <p class="source-description">Open a local SNDH, SND, or YM file. Files you select stay in your browser.</p>
+        <label class="file-label" for="music-file">Local music file</label>
+        <input id="music-file" class="file-input" type="file" accept=".sndh,.snd,.ym" aria-describedby="file-hint">
+        <p id="file-hint" class="hint">Playback starts only when you press Play.</p>
+        <div class="reference-row">
+          <button id="load-reference" class="button" type="button">Load Comic Bakery</button>
+          <span class="reference-note">Reference track / Mad Max</span>
+        </div>
+      </section>
+
+      <p id="error" class="error" role="alert" hidden></p>
+      <footer>Built for listening. No uploads. No autoplay.</footer>
+    </main>
+  </body>
+</html>
