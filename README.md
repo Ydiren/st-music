@@ -48,15 +48,27 @@ access when the browser provides it. Alternatively use **Select a folder
 available when direct folder access is unsupported.
 
 The scanner discovers `.sndh`, `.snd`, and `.ym` files recursively, ignoring
-extension case. The list shows paths relative to the selected root, in discovery
-order, with 100 tracks per page. Select a track to load its metadata and subtunes
-into the existing player, then press Play. Browsing or scanning does not stop
-current playback; explicitly loading a different track does.
+extension case. Each result shows embedded title, composer, year, subtune count,
+and its path relative to the selected root. Missing metadata is shown as Unknown;
+files whose metadata cannot be read remain listed with a warning.
 
-Discovery runs in a dedicated Web Worker. The worker retains file references
-and reads song bytes only when selected. The app does not upload music, copy it
-into browser storage, or retain the collection across visits. Reselect the folder
-after refreshing. ZIP discovery, metadata search/sorting, deduplication, and
+Search is case-insensitive and requires every whitespace-separated word to
+match somewhere in the title, composer, year, subtune count, or path. Sort by
+source path, title, composer, year, or subtune count, in either direction.
+Numeric portions sort naturally, missing values stay last in both directions,
+and ties use source path. Changing search or sort returns to the first page.
+Results update while indexing continues, with at most 100 matches per page.
+Select a result to load it into the existing transport, then press Play.
+Browsing, searching, sorting, and indexing do not stop current playback;
+explicitly loading a different track does.
+
+Indexing and queries run in a dedicated Web Worker. It reads one file at a time
+and uses a separate AtariAudio instance to parse metadata without initializing
+or executing the music's replay code. Temporary file bytes and parser data are
+released after inspection; only metadata and source references are indexed.
+Selecting a track reads its bytes again for playback. The app does not upload
+music, copy it into persistent browser storage, or retain the collection across
+visits. Reselect the folder after refreshing. ZIP discovery, deduplication, and
 catalog persistence remain separate features.
 
 ## Implementation
@@ -69,14 +81,18 @@ catalog persistence remain separate features.
   arrays per block. Fixed 64 MiB WebAssembly memory avoids growth during rendering.
 - `player.js`: transport commands, position reporting, and smoothed output gain.
 - `app.js`, `index.html`, `style.css`: local loading, credits, and transport UI.
-- `collection.js`: folder selection, paginated source-path browsing, and handoff
-  to the transport.
-- `collection-worker.js`: recursive discovery, file reference indexing, and
-  on-demand music reads. Fallback relative paths are sent explicitly because
+- `collection.js`: folder selection, search/sort controls, paginated metadata
+  results, and handoff to the transport. Stable entry IDs retain source identity
+  after sorting; query revisions reject stale responses.
+- `collection-worker.js`: recursive discovery, AtariAudio metadata inspection,
+  cached filtering/sorting, and on-demand playback reads. Only the current page
+  is sent to the UI. Fallback relative paths are sent explicitly because
   nonstandard File properties are not a reliable structured-cloning contract.
 
-WebAssembly bytes are fetched on the main thread and transferred to the
-AudioWorklet for initialization; the worklet does not fetch resources itself.
+For playback, WebAssembly bytes are fetched on the main thread and transferred
+to the AudioWorklet for initialization; the worklet does not fetch resources.
+The collection worker independently loads the same generated engine for
+metadata inspection, with separate state and memory from the audio renderer.
 Pause suspends the AudioContext after acknowledging the exact render position.
 An explicit Play resumes it. Acknowledged Stop resets the engine before the UI
 shows zero.
@@ -92,9 +108,9 @@ are required.
 ## Current scope and verification
 
 Playback supports numbered subtune selection and continuous looping, with a
-session-only folder browser. Metadata search/sorting, ZIP indexing,
-deduplication, persistence, queue/duration policies, visualization, mute/solo,
-and offline app caching are not yet implemented.
+session-only searchable, sortable metadata library. ZIP indexing, deduplication,
+persistence, queue/duration policies, visualization, mute/solo, and offline app
+caching are not yet implemented.
 
 Browser smoke checks exercised Comic Bakery at 48 kHz through the actual
 AudioWorklet: non-silent varying PCM, pause position preservation, resume, zero
@@ -119,6 +135,16 @@ fallback, and a 390 px layout without horizontal overflow. The directory-handle
 fixture used temporary origin-private storage; the FileList fixture was supplied
 programmatically. Native OS chooser interaction and Firefox/Safari remain manual
 verification items; these checks do not claim to exercise those permission UIs.
+
+Metadata-library smoke checks in Chromium indexed a 3,008-file fixture containing
+real Mad Max, Count Zero, AN Cool, and YM music, plus malformed and missing-tag
+examples. Checks covered live multi-word/case-insensitive search, numeric subtune
+sorting (1, 9, 17), unknown values last, natural source-path ordering, pagination,
+rapid replacement queries, empty results/clearing search, and correct result-to-
+track/subtune loading. The isolated indexing run kept audio running with
+non-silent PCM, at most 100 DOM rows, and no main-thread tasks over 50 ms.
+Direct directory-handle metadata lookup and the FileList fallback were both
+exercised; a 390 px layout was visually checked without horizontal overflow.
 
 AtariAudio is pinned to `5fd4b46b1a2a8fa776f8f0f68f648ef70c03ef10` (1.30).
 See `THIRD_PARTY_NOTICES.txt` for engine licenses and credits. Music rights are

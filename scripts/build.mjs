@@ -35,7 +35,7 @@ await mkdir('generated', { recursive: true });
 run(process.env.EMXX || 'em++', [
   'native/bridge.cpp', ...await sources('vendor/AtariAudio/src'),
   '-Ivendor/AtariAudio/src', '-std=c++17', '-O3', '-DNDEBUG',
-  '-sMODULARIZE=1', '-sEXPORT_ES6=1', '-sENVIRONMENT=worklet',
+  '-sMODULARIZE=1', '-sEXPORT_ES6=1', '-sENVIRONMENT=worker,worklet',
   '-sINCOMING_MODULE_JS_API=["wasmBinary"]',
   '-sINITIAL_MEMORY=67108864', '-sALLOW_MEMORY_GROWTH=0',
   '-sEXPORTED_FUNCTIONS=["_malloc","_free"]',

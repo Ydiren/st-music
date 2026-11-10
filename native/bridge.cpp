@@ -14,10 +14,15 @@ EMSCRIPTEN_KEEPALIVE void unload_song() {
     currentSubtune = 0;
 }
 
-EMSCRIPTEN_KEEPALIVE int load_song(const void* data, unsigned size, unsigned rate) {
+// Metadata inspection deliberately does not execute the embedded replay code.
+EMSCRIPTEN_KEEPALIVE int inspect_song(const void* data, unsigned size, unsigned rate) {
     unload_song();
     renderer = AtariAudioRenderer::Create(data, size, rate);
-    if (!renderer) return 0;
+    return renderer != nullptr;
+}
+
+EMSCRIPTEN_KEEPALIVE int load_song(const void* data, unsigned size, unsigned rate) {
+    if (!inspect_song(data, size, rate)) return 0;
     if (!renderer->InitSubSong(renderer->GetSongInfo().defaultSubsong)) {
         unload_song();
         return 0;

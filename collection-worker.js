@@ -1,25 +1,104 @@
-// File objects and directory handles stay in this worker. Song bytes are read
-// only on selection, never while discovering a collection.
-const sources = new Map();
-const supported = /\.(sndh|snd|ym)$/i;
-let nextId = 0;
-let batch = [];
-let scanned = 0;
+import createAtariAudio from './generated/atari-audio.js';
 
-function flush() {
-  self.postMessage({ type: 'entries', entries: batch, scanned });
-  batch = [];
+const PAGE_SIZE = 100;
+const sources = new Map();
+const entries = [];
+const supported = /\.(sndh|snd|ym)$/i;
+const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+let engine;
+let scanned = 0;
+let unavailable = 0;
+let scanning = false;
+let failed = false;
+let lastPublish = 0;
+let query = { revision: 0, text: '', sort: 'path', direction: 'asc', page: 0 };
+let cachedView;
+
+function matchesAndSorts() {
+  const key = JSON.stringify([query.text, query.sort, query.direction, entries.length]);
+  if (cachedView?.key === key) return cachedView.entries;
+  const terms = query.text.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const matches = entries.filter(entry => terms.every(term => entry.search.includes(term)));
+  const field = query.sort;
+  const direction = query.direction === 'desc' ? -1 : 1;
+  matches.sort((a, b) => {
+    const av = a[field];
+    const bv = b[field];
+    const aMissing = av === null || av === '';
+    const bMissing = bv === null || bv === '';
+    // Unknown values stay last in both directions, rather than looking like 0.
+    if (aMissing !== bMissing) return aMissing ? 1 : -1;
+    const comparison = aMissing ? 0 : field === 'subtuneCount' ? av - bv : collator.compare(av, bv);
+    return comparison * direction || collator.compare(a.path, b.path) || a.id - b.id;
+  });
+  cachedView = { key, entries: matches };
+  return matches;
 }
 
-function discover(path, source) {
+function publish() {
+  const matches = matchesAndSorts();
+  const page = Math.min(query.page, Math.max(0, Math.ceil(matches.length / PAGE_SIZE) - 1));
+  const start = page * PAGE_SIZE;
+  self.postMessage({
+    type: 'view', revision: query.revision, page,
+    total: entries.length, matched: matches.length, scanned, scanning, failed, unavailable,
+    entries: matches.slice(start, start + PAGE_SIZE).map(({ search, ...entry }) => entry),
+  });
+  lastPublish = performance.now();
+}
+
+async function initializeEngine() {
+  const response = await fetch(new URL('./generated/atari-audio.wasm', import.meta.url));
+  if (!response.ok) throw new Error(`Could not load the metadata engine (${response.status}). Run npm run build first.`);
+  engine = await createAtariAudio({ wasmBinary: await response.arrayBuffer() });
+}
+
+async function getFile(source) {
+  return source.kind === 'file' ? source.getFile() : source;
+}
+
+async function metadata(source) {
+  const bytes = new Uint8Array(await (await getFile(source)).arrayBuffer());
+  const pointer = engine._malloc(bytes.length);
+  if (!pointer) throw new Error('Not enough engine memory to inspect this file.');
+  try {
+    engine.HEAPU8.set(bytes, pointer);
+    if (!engine._inspect_song(pointer, bytes.length, 48000)) throw new Error('Metadata unavailable: unrecognized music data.');
+    return {
+      title: engine.UTF8ToString(engine._song_title()).trim(),
+      author: engine.UTF8ToString(engine._song_author()).trim(),
+      year: engine.UTF8ToString(engine._song_year()).trim(),
+      subtuneCount: engine._subtune_count() || null,
+    };
+  } finally {
+    engine._unload_song();
+    engine._free(pointer);
+  }
+}
+
+async function discover(path, source) {
   scanned++;
   if (supported.test(path)) {
-    const id = nextId++;
+    const id = entries.length;
     sources.set(id, source);
-    batch.push({ id, path });
+    let info;
+    let metadataError = '';
+    try {
+      info = await metadata(source);
+    } catch (error) {
+      // Keep the file discoverable; an indexing error must not hide it or stop
+      // other files being indexed. Loading it still uses the normal player.
+      info = { title: '', author: '', year: '', subtuneCount: null };
+      metadataError = error.message;
+      unavailable++;
+    }
+    const entry = { id, path, ...info, metadataError };
+    entry.search = [entry.title, entry.author, entry.year, entry.subtuneCount ?? '', path].join('\n').toLowerCase();
+    entries.push(entry);
   }
-  // Report progress even in folders containing only unrelated files.
-  if (scanned % 100 === 0) flush();
+  if (performance.now() - lastPublish >= 100) publish();
+  // Allow queries and read requests through even in mostly non-music folders.
+  if (scanned % 100 === 0) await new Promise(resolve => setTimeout(resolve, 0));
 }
 
 async function scanDirectory(root) {
@@ -29,35 +108,41 @@ async function scanDirectory(root) {
     for await (const [name, handle] of directory.entries()) {
       const path = prefix + name;
       if (handle.kind === 'directory') pending.push({ directory: handle, prefix: path + '/' });
-      else if (handle.kind === 'file') discover(path, handle);
+      else if (handle.kind === 'file') await discover(path, handle);
     }
   }
 }
 
 self.onmessage = async ({ data }) => {
   if (data.type === 'scan') {
+    scanning = true;
+    publish();
     try {
+      await initializeEngine();
       if (data.directory) {
         await scanDirectory(data.directory);
       } else {
         for (const { file, path: relative } of data.files) {
           // Preserve relative paths explicitly across File structured cloning.
           const path = relative.includes('/') ? relative.slice(relative.indexOf('/') + 1) : relative;
-          discover(path, file);
+          await discover(path, file);
         }
       }
-      flush();
-      self.postMessage({ type: 'done', scanned });
     } catch (error) {
-      flush();
+      failed = true;
       self.postMessage({ type: 'scan-error', error: error.message });
+    } finally {
+      scanning = false;
+      publish();
     }
+  } else if (data.type === 'query') {
+    query = { revision: data.revision, text: data.text, sort: data.sort, direction: data.direction, page: data.page };
+    publish();
   } else if (data.type === 'read') {
     try {
       const source = sources.get(data.id);
       if (!source) throw new Error('This collection entry is no longer available.');
-      const file = source.kind === 'file' ? await source.getFile() : source;
-      const buffer = await file.arrayBuffer();
+      const buffer = await (await getFile(source)).arrayBuffer();
       self.postMessage({ type: 'read', request: data.request, buffer }, [buffer]);
     } catch (error) {
       self.postMessage({ type: 'read', request: data.request, error: error.message });

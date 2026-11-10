@@ -58,9 +58,31 @@
         <label class="file-label folder-label" for="folder-files">Select a folder (compatible mode)</label>
         <input id="folder-files" class="file-input" type="file" webkitdirectory multiple aria-describedby="collection-hint">
         <p id="collection-hint" class="hint">Folder access varies by browser. Both choices keep music on-device; nothing is uploaded or saved between visits.</p>
+        <div class="collection-tools">
+          <label class="collection-search">Search
+            <input id="collection-search" type="search" placeholder="Title, composer, year, or path" aria-describedby="collection-search-hint">
+          </label>
+          <label>Sort by
+            <select id="collection-sort">
+              <option value="path">Source path</option>
+              <option value="title">Title</option>
+              <option value="author">Composer</option>
+              <option value="year">Year</option>
+              <option value="subtuneCount">Subtune count</option>
+            </select>
+          </label>
+          <label>Order
+            <select id="collection-order">
+              <option value="asc">Ascending</option>
+              <option value="desc">Descending</option>
+            </select>
+          </label>
+        </div>
+        <p id="collection-search-hint" class="hint">Search is case-insensitive; all words must match. Unknown sort values stay last.</p>
         <p id="collection-status" class="collection-status" role="status">No folder selected.</p>
         <p id="collection-error" class="error" role="alert" hidden></p>
         <ul id="collection-list" class="collection-list" aria-label="Music files"></ul>
+        <p id="collection-empty" class="hint" hidden>No matching music files.</p>
         <nav class="collection-pagination" aria-label="Collection pages">
           <button id="collection-previous" class="button" type="button" disabled>Previous page</button>
           <span id="collection-page" class="hint">0 files</span>
