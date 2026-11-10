@@ -40,6 +40,25 @@ server port.
 If an older Node installation shadows Homebrew's, use
 `export PATH="$(brew --prefix node)/bin:$PATH"` before running the commands.
 
+## Browse a collection
+
+In **Your collection**, use **Choose folder** for direct read-only directory
+access when the browser provides it. Alternatively use **Select a folder
+(compatible mode)**, which uses the browser's directory file input and is also
+available when direct folder access is unsupported.
+
+The scanner discovers `.sndh`, `.snd`, and `.ym` files recursively, ignoring
+extension case. The list shows paths relative to the selected root, in discovery
+order, with 100 tracks per page. Select a track to load its metadata and subtunes
+into the existing player, then press Play. Browsing or scanning does not stop
+current playback; explicitly loading a different track does.
+
+Discovery runs in a dedicated Web Worker. The worker retains file references
+and reads song bytes only when selected. The app does not upload music, copy it
+into browser storage, or retain the collection across visits. Reselect the folder
+after refreshing. ZIP discovery, metadata search/sorting, deduplication, and
+catalog persistence remain separate features.
+
 ## Implementation
 
 - `native/bridge.cpp`: small C interface around the AtariAudio renderer.
@@ -50,6 +69,11 @@ If an older Node installation shadows Homebrew's, use
   arrays per block. Fixed 64 MiB WebAssembly memory avoids growth during rendering.
 - `player.js`: transport commands, position reporting, and smoothed output gain.
 - `app.js`, `index.html`, `style.css`: local loading, credits, and transport UI.
+- `collection.js`: folder selection, paginated source-path browsing, and handoff
+  to the transport.
+- `collection-worker.js`: recursive discovery, file reference indexing, and
+  on-demand music reads. Fallback relative paths are sent explicitly because
+  nonstandard File properties are not a reliable structured-cloning contract.
 
 WebAssembly bytes are fetched on the main thread and transferred to the
 AudioWorklet for initialization; the worklet does not fetch resources itself.
@@ -67,10 +91,10 @@ are required.
 
 ## Current scope and verification
 
-This is the initial playback implementation, not the library/explorer release.
-It loads the file's default subtune, supports numbered subtune selection, and
-permits continuous looping. Queue/duration policies, folder/ZIP indexing,
-visualization, mute/solo, and offline app caching are not yet implemented.
+Playback supports numbered subtune selection and continuous looping, with a
+session-only folder browser. Metadata search/sorting, ZIP indexing,
+deduplication, persistence, queue/duration policies, visualization, mute/solo,
+and offline app caching are not yet implemented.
 
 Browser smoke checks exercised Comic Bakery at 48 kHz through the actual
 AudioWorklet: non-silent varying PCM, pause position preservation, resume, zero
@@ -84,6 +108,17 @@ selected subtune, and replacement by a single-subtune file. Desktop and mobile
 selector layouts were visually checked. The user has additionally confirmed
 sampled-sound SNDH, digi drums, and YM sampled playback by listening.
 Compatibility with other browsers remains unverified.
+
+Collection smoke checks in Chromium used a 3,004-track nested fixture with real
+browser FileSystemDirectoryHandles and a FileList fallback. Both paths loaded
+Wings of Death with its nine subtunes. During scanning, playback remained running,
+only 100 rows were mounted, and no main-thread tasks over 50 ms were recorded.
+Checks also covered extension case, ignoring non-music files, pagination,
+replacement, empty collections, picker cancellation, the direct-API-absent
+fallback, and a 390 px layout without horizontal overflow. The directory-handle
+fixture used temporary origin-private storage; the FileList fixture was supplied
+programmatically. Native OS chooser interaction and Firefox/Safari remain manual
+verification items; these checks do not claim to exercise those permission UIs.
 
 AtariAudio is pinned to `5fd4b46b1a2a8fa776f8f0f68f648ef70c03ef10` (1.30).
 See `THIRD_PARTY_NOTICES.txt` for engine licenses and credits. Music rights are

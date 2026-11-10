@@ -1,4 +1,5 @@
 import { Player } from './player.js';
+import { CollectionBrowser } from './collection.js';
 
 const elements = {
   status: document.querySelector('#status'),
@@ -29,6 +30,7 @@ const state = {
 };
 
 let player;
+let collection;
 
 function formatTime(seconds) {
   const total = Number.isFinite(seconds) ? Math.max(0, Math.floor(seconds)) : 0;
@@ -38,6 +40,7 @@ function formatTime(seconds) {
 
 function render() {
   const unavailable = Boolean(state.busy) || !player;
+  collection?.setBusy(unavailable);
   const ready = state.hasTrack && !unavailable;
   elements.play.disabled = !ready || !['stopped', 'paused'].includes(state.status);
   elements.pause.disabled = !ready || state.status !== 'playing';
@@ -196,4 +199,5 @@ try {
 } catch (error) {
   reportError(error);
 }
+collection = new CollectionBrowser((path, readBuffer) => loadTrack(path, readBuffer));
 render();

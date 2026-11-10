@@ -51,6 +51,23 @@
         </div>
       </section>
 
+      <section class="source-panel" aria-labelledby="collection-heading">
+        <h2 id="collection-heading">Your collection</h2>
+        <p class="source-description">Browse a local folder and its subfolders. Select a track to load it, then press Play.</p>
+        <button id="choose-folder" class="button" type="button" hidden>Choose folder</button>
+        <label class="file-label folder-label" for="folder-files">Select a folder (compatible mode)</label>
+        <input id="folder-files" class="file-input" type="file" webkitdirectory multiple aria-describedby="collection-hint">
+        <p id="collection-hint" class="hint">Folder access varies by browser. Both choices keep music on-device; nothing is uploaded or saved between visits.</p>
+        <p id="collection-status" class="collection-status" role="status">No folder selected.</p>
+        <p id="collection-error" class="error" role="alert" hidden></p>
+        <ul id="collection-list" class="collection-list" aria-label="Music files"></ul>
+        <nav class="collection-pagination" aria-label="Collection pages">
+          <button id="collection-previous" class="button" type="button" disabled>Previous page</button>
+          <span id="collection-page" class="hint">0 files</span>
+          <button id="collection-next" class="button" type="button" disabled>Next page</button>
+        </nav>
+      </section>
+
       <section class="source-panel" aria-labelledby="source-heading">
         <h2 id="source-heading">Choose your music</h2>
         <p class="source-description">Open a local SNDH, SND, or YM file. Files you select stay in your browser.</p>

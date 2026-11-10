@@ -112,6 +112,17 @@ input::file-selector-button { margin-right: .8rem; }
 [hidden] { display: none !important; }
 footer { color: var(--muted); font-size: .65rem; line-height: 1.7; text-align: center; padding-top: 1.75rem; }
 
+.folder-label { margin-top: 1rem; }
+.collection-status { color: var(--muted); font-size: .85rem; line-height: 1.6; overflow-wrap: anywhere; }
+.collection-list { list-style: none; padding: 0; margin: 1rem 0; max-height: 24rem; overflow-y: auto; border-block: 1px solid var(--border); }
+.collection-list li + li { border-top: 1px solid var(--border); }
+.collection-list button { display: block; width: 100%; min-height: 44px; padding: .75rem; border: 0; color: inherit; background: transparent; text-align: left; font-family: var(--mono); font-size: .75rem; line-height: 1.5; overflow-wrap: anywhere; }
+.collection-list button:not(:disabled):hover { background: #253034; }
+.collection-list button:focus-visible { outline-offset: -3px; }
+.collection-list button:disabled { opacity: .4; }
+.collection-pagination { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .75rem; }
+.collection-pagination .hint { margin: 0; }
+
 @media (max-width: 440px) {
   .player { width: calc(100% - 2rem); }
   .page-header { margin-bottom: 2rem; }
