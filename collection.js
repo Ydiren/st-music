@@ -188,14 +188,14 @@ export class CollectionBrowser {
 
   render() {
     const status = !this.root ? 'No folder selected.'
-      : this.scanning ? `Indexing ${this.root}: ${this.scanned} files checked, ${this.total} music files indexed…`
-      : this.failed ? `${this.root}: indexing incomplete; ${this.total} music files available.`
-      : this.total ? `${this.root}: ${this.total} music files indexed.`
+      : this.scanning ? `Indexing ${this.root}: ${this.scanned} files checked, ${this.total} unique tracks indexed…`
+      : this.failed ? `${this.root}: indexing incomplete; ${this.total} unique tracks available.`
+      : this.total ? `${this.root}: ${this.total} unique tracks indexed.`
       : `${this.root}: no SNDH, SND, or YM files found.`;
     const summary = this.unavailable ? `${status} Metadata unavailable for ${this.unavailable} file${this.unavailable === 1 ? '' : 's'}.` : status;
     const statusElement = this.elements['collection-status'];
     if (statusElement.textContent !== summary) statusElement.textContent = summary;
-    const signature = this.entries.map(entry => entry.id).join(',');
+    const signature = this.entries.map(entry => `${entry.id}:${entry.locations.length}`).join(',');
     if (signature !== this.renderedRows) {
       const fragment = document.createDocumentFragment();
       for (const entry of this.entries) {
@@ -211,8 +211,14 @@ export class CollectionBrowser {
         credits.textContent = `Composer: ${entry.author || 'Unknown'} · Year: ${entry.year || 'Unknown'} · Subtunes: ${entry.subtuneCount ?? 'Unknown'}`;
         const path = document.createElement('span');
         path.className = 'collection-track-path';
-        path.textContent = entry.archivePath
-          ? `ZIP: ${entry.archivePath}\nFile: ${entry.memberPath}` : entry.path;
+        path.textContent = entry.locations.map(location => location.archivePath
+          ? `ZIP: ${location.archivePath}\nFile: ${location.memberPath}` : location.path).join('\n');
+        if (entry.locations.length > 1) {
+          const count = document.createElement('span');
+          count.className = 'collection-track-metadata';
+          count.textContent = `${entry.locations.length} source locations`;
+          button.append(count);
+        }
         button.append(title, credits, path);
         if (entry.metadataError) {
           const warning = document.createElement('span');
@@ -229,8 +235,8 @@ export class CollectionBrowser {
     }
     const start = this.page * PAGE_SIZE;
     this.elements['collection-page'].textContent = this.matched
-      ? `${start + 1}–${start + this.entries.length} of ${this.matched} matches (${this.total} files)`
-      : `0 matches (${this.total} files)`;
+      ? `${start + 1}–${start + this.entries.length} of ${this.matched} matches (${this.total} unique tracks)`
+      : `0 matches (${this.total} unique tracks)`;
     this.elements['collection-empty'].hidden = !this.root || this.entries.length > 0 || this.waiting;
     this.elements['collection-empty'].textContent = this.scanning
       ? 'No matches yet. Metadata indexing is still running.' : 'No matching music files.';
