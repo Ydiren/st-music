@@ -10,6 +10,7 @@ On macOS with Homebrew:
 
 ```sh
 brew install node emscripten
+npm ci
 npm run build
 npm start
 ```
@@ -31,9 +32,10 @@ The reference button reads the existing file at
 bundle any music. The file picker also works without that reference collection.
 Selected files are read in memory and are not uploaded or persisted.
 
-No npm dependencies or `npm install` are needed. The first build downloads the
-pinned AtariAudio revision into `vendor/AtariAudio`; later builds reuse it and
-reject a different revision. Generated engine assets live in `generated/`.
+Run `npm ci` to install the pinned ZIP reader from the lockfile. The first build
+downloads the pinned AtariAudio revision into `vendor/AtariAudio`; later builds
+reuse it and reject a different revision. Generated engine and ZIP assets,
+including redistribution notices, live in `generated/`.
 `EMXX` can specify a different compiler executable. `PORT` changes the local
 server port.
 
@@ -47,10 +49,12 @@ access when the browser provides it. Alternatively use **Select a folder
 (compatible mode)**, which uses the browser's directory file input and is also
 available when direct folder access is unsupported.
 
-The scanner discovers `.sndh`, `.snd`, and `.ym` files recursively, ignoring
-extension case. Each result shows embedded title, composer, year, subtune count,
-and its path relative to the selected root. Missing metadata is shown as Unknown;
-files whose metadata cannot be read remain listed with a warning.
+The scanner discovers `.sndh`, `.snd`, and `.ym` files in subfolders and inside
+`.zip` archives, ignoring extension case. Each result shows embedded title,
+composer, year, subtune count, and its source path. Archived tracks additionally
+show the archive path and full member path; both participate in search/sorting.
+Missing metadata is shown as Unknown; unreadable tracks remain listed with a
+warning.
 
 Search is case-insensitive and requires every whitespace-separated word to
 match somewhere in the title, composer, year, subtune count, or path. Sort by
@@ -66,10 +70,19 @@ Indexing and queries run in a dedicated Web Worker. It reads one file at a time
 and uses a separate AtariAudio instance to parse metadata without initializing
 or executing the music's replay code. Temporary file bytes and parser data are
 released after inspection; only metadata and source references are indexed.
-Selecting a track reads its bytes again for playback. The app does not upload
-music, copy it into persistent browser storage, or retain the collection across
-visits. Reselect the folder after refreshing. ZIP discovery, deduplication, and
-catalog persistence remain separate features.
+Selecting a track reads its bytes again for playback. ZIPs are read by byte
+ranges, not buffered as whole archives; music members are extracted individually
+for inspection and re-extracted on selection. Extracted bytes are discarded
+after use, not cached or written into persistent browser storage. The app does
+not upload music or retain the collection across visits. Reselect the folder
+after refreshing. Deduplication and catalog persistence remain separate features.
+
+Nested ZIPs are not traversed. Password-protected members remain visible but
+cannot be played. Corrupt archives report their source paths and do not stop
+other files from being indexed; member CRC failures appear as metadata/playback
+errors rather than feeding damaged bytes into AtariAudio. Extraction checks
+declared and actual output size and rejects members larger than the fixed audio
+engine memory capacity.
 
 ## Implementation
 
@@ -88,6 +101,10 @@ catalog persistence remain separate features.
   cached filtering/sorting, and on-demand playback reads. Only the current page
   is sent to the UI. Fallback relative paths are sent explicitly because
   nonstandard File properties are not a reliable structured-cloning contract.
+- `zip-archive.js`: range-based ZIP enumeration and bounded, CRC-checked member
+  extraction, using zip.js 2.24.0 inside the existing collection worker.
+- `scripts/zip-assets.mjs`: copies the self-contained ZIP module and license
+  notices into `generated/`; no CDN or nested ZIP workers are required.
 
 For playback, WebAssembly bytes are fetched on the main thread and transferred
 to the AudioWorklet for initialization; the worklet does not fetch resources.
@@ -108,9 +125,9 @@ are required.
 ## Current scope and verification
 
 Playback supports numbered subtune selection and continuous looping, with a
-session-only searchable, sortable metadata library. ZIP indexing, deduplication,
-persistence, queue/duration policies, visualization, mute/solo, and offline app
-caching are not yet implemented.
+session-only searchable, sortable library of loose and ZIP-contained music.
+Deduplication, persistence, queue/duration policies, visualization, mute/solo, and
+offline app caching are not yet implemented.
 
 Browser smoke checks exercised Comic Bakery at 48 kHz through the actual
 AudioWorklet: non-silent varying PCM, pause position preservation, resume, zero
@@ -145,6 +162,20 @@ track/subtune loading. The isolated indexing run kept audio running with
 non-silent PCM, at most 100 DOM rows, and no main-thread tasks over 50 ms.
 Direct directory-handle metadata lookup and the FileList fallback were both
 exercised; a 390 px layout was visually checked without horizontal overflow.
+
+ZIP browser smoke checks indexed a 3,007-track mixed fixture containing stored
+and deflated music, Unicode member paths, an unreadable archive, a bad-CRC
+member, and a password-protected member. Healthy tracks remained searchable
+and playable; identical member paths in different archives loaded the correct
+music and subtunes. Tests verified nested ZIP exclusion, recovery after a
+damaged track, FileList and real directory-handle paths, and a 390 px layout.
+Indexing preserved running audio/non-silent PCM and recorded no main-thread
+tasks over 50 ms. Browser-only fixtures were removed after verification.
+
+Run `npm test` for the ZIP regression suite (Emscripten is not needed for these
+tests). Independent fixtures cover stored/deflated members, Unicode names,
+reading after enumeration closes, CRC corruption, output-capacity boundaries,
+forged sizes, and truncated archives.
 
 AtariAudio is pinned to `5fd4b46b1a2a8fa776f8f0f68f648ef70c03ef10` (1.30).
 See `THIRD_PARTY_NOTICES.txt` for engine licenses and credits. Music rights are

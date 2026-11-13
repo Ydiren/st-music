@@ -1,4 +1,4 @@
-import { copyFile, mkdir, readdir } from 'node:fs/promises';
+import { readdir } from 'node:fs/promises';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -31,7 +31,7 @@ async function sources(directory) {
   }
   return files;
 }
-await mkdir('generated', { recursive: true });
+await import('./zip-assets.mjs');
 run(process.env.EMXX || 'em++', [
   'native/bridge.cpp', ...await sources('vendor/AtariAudio/src'),
   '-Ivendor/AtariAudio/src', '-std=c++17', '-O3', '-DNDEBUG',
@@ -42,5 +42,4 @@ run(process.env.EMXX || 'em++', [
   '-sEXPORTED_RUNTIME_METHODS=["UTF8ToString","HEAPU8","HEAP16"]',
   '-o', 'generated/atari-audio.js',
 ]);
-await copyFile('THIRD_PARTY_NOTICES.txt', 'generated/THIRD_PARTY_NOTICES.txt');
 console.log(`Built AtariAudio ${revision} → generated/atari-audio.{js,wasm}`);

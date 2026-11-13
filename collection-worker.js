@@ -1,4 +1,5 @@
 import createAtariAudio from './generated/atari-audio.js';
+import { archiveEntries, readArchiveEntry } from './zip-archive.js';
 
 const PAGE_SIZE = 100;
 const sources = new Map();
@@ -57,8 +58,13 @@ async function getFile(source) {
   return source.kind === 'file' ? source.getFile() : source;
 }
 
+async function sourceBytes(source) {
+  if (source.zipEntry) return readArchiveEntry(source.zipEntry, engine.HEAPU8.byteLength);
+  return new Uint8Array(await (await getFile(source)).arrayBuffer());
+}
+
 async function metadata(source) {
-  const bytes = new Uint8Array(await (await getFile(source)).arrayBuffer());
+  const bytes = await sourceBytes(source);
   const pointer = engine._malloc(bytes.length);
   if (!pointer) throw new Error('Not enough engine memory to inspect this file.');
   try {
@@ -76,8 +82,22 @@ async function metadata(source) {
   }
 }
 
-async function discover(path, source) {
+async function discover(path, source, provenance = {}) {
   scanned++;
+  if (!provenance.archivePath && /\.zip$/i.test(path)) {
+    try {
+      for await (const entry of archiveEntries(await getFile(source))) {
+        // Nested ZIPs and non-music members are deliberately not extracted.
+        if (!entry.directory && supported.test(entry.filename)) {
+          await discover(`${path} :: ${entry.filename}`, { zipEntry: entry }, {
+            archivePath: path, memberPath: entry.filename,
+          });
+        }
+      }
+    } catch (error) {
+      self.postMessage({ type: 'archive-error', path, error: error.message });
+    }
+  }
   if (supported.test(path)) {
     const id = entries.length;
     sources.set(id, source);
@@ -92,7 +112,7 @@ async function discover(path, source) {
       metadataError = error.message;
       unavailable++;
     }
-    const entry = { id, path, ...info, metadataError };
+    const entry = { id, path, ...provenance, ...info, metadataError };
     entry.search = [entry.title, entry.author, entry.year, entry.subtuneCount ?? '', path].join('\n').toLowerCase();
     entries.push(entry);
   }
@@ -142,7 +162,7 @@ self.onmessage = async ({ data }) => {
     try {
       const source = sources.get(data.id);
       if (!source) throw new Error('This collection entry is no longer available.');
-      const buffer = await (await getFile(source)).arrayBuffer();
+      const buffer = (await sourceBytes(source)).buffer;
       self.postMessage({ type: 'read', request: data.request, buffer }, [buffer]);
     } catch (error) {
       self.postMessage({ type: 'read', request: data.request, error: error.message });

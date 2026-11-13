@@ -5,7 +5,13 @@
   "type": "module",
   "scripts": {
     "build": "node scripts/build.mjs",
-    "start": "node scripts/serve.mjs"
+    "start": "node scripts/serve.mjs",
+    "test": "node scripts/zip-assets.mjs && node --test tests/*.test.js"
   },
-  "engines": { "node": ">=20" }
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@zip.js/zip.js": "2.24.0"
+  }
 }

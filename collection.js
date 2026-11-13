@@ -97,6 +97,7 @@ export class CollectionBrowser {
     this.page = 0;
     this.scanned = 0;
     this.unavailable = 0;
+    this.archiveErrors = [];
     this.root = root;
     this.scanning = true;
     this.failed = false;
@@ -122,6 +123,9 @@ export class CollectionBrowser {
         this.scheduleRender();
       } else if (data.type === 'scan-error') {
         this.showError(`Could not finish indexing the folder: ${data.error}`);
+      } else if (data.type === 'archive-error') {
+        this.archiveErrors.push(`Could not index ZIP ${data.path}: ${data.error}`);
+        this.showError(this.archiveErrors.join('\n'));
       } else if (data.type === 'read') {
         const request = this.pending.get(data.request);
         if (!request) return;
@@ -207,7 +211,8 @@ export class CollectionBrowser {
         credits.textContent = `Composer: ${entry.author || 'Unknown'} · Year: ${entry.year || 'Unknown'} · Subtunes: ${entry.subtuneCount ?? 'Unknown'}`;
         const path = document.createElement('span');
         path.className = 'collection-track-path';
-        path.textContent = entry.path;
+        path.textContent = entry.archivePath
+          ? `ZIP: ${entry.archivePath}\nFile: ${entry.memberPath}` : entry.path;
         button.append(title, credits, path);
         if (entry.metadataError) {
           const warning = document.createElement('span');
