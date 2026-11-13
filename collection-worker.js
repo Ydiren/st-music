@@ -4,6 +4,7 @@ import { archiveEntries, readArchiveEntry } from './zip-archive.js';
 const PAGE_SIZE = 100;
 const sources = new Map();
 const entries = [];
+const identities = new Map();
 const supported = /\.(sndh|snd|ym)$/i;
 const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
 let engine;
@@ -60,11 +61,24 @@ async function getFile(source) {
 
 async function sourceBytes(source) {
   if (source.zipEntry) return readArchiveEntry(source.zipEntry, engine.HEAPU8.byteLength);
+  if (source.archive) {
+    let memberIndex = 0;
+    for await (const entry of archiveEntries(await getFile(source.archive))) {
+      if (memberIndex++ === source.memberIndex && !entry.directory && entry.filename === source.memberPath) {
+        return readArchiveEntry(entry, engine.HEAPU8.byteLength);
+      }
+    }
+    throw new Error('The ZIP member is no longer available.');
+  }
   return new Uint8Array(await (await getFile(source)).arrayBuffer());
 }
 
-async function metadata(source) {
-  const bytes = await sourceBytes(source);
+async function contentId(bytes) {
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
+function metadata(bytes) {
   const pointer = engine._malloc(bytes.length);
   if (!pointer) throw new Error('Not enough engine memory to inspect this file.');
   try {
@@ -86,35 +100,58 @@ async function discover(path, source, provenance = {}) {
   scanned++;
   if (!provenance.archivePath && /\.zip$/i.test(path)) {
     try {
+      let memberIndex = 0;
       for await (const entry of archiveEntries(await getFile(source))) {
         // Nested ZIPs and non-music members are deliberately not extracted.
         if (!entry.directory && supported.test(entry.filename)) {
-          await discover(`${path} :: ${entry.filename}`, { zipEntry: entry }, {
+          await discover(`${path} :: ${entry.filename}`, { zipEntry: entry, archive: source, memberPath: entry.filename, memberIndex }, {
             archivePath: path, memberPath: entry.filename,
           });
         }
+        memberIndex++;
       }
     } catch (error) {
       self.postMessage({ type: 'archive-error', path, error: error.message });
     }
   }
   if (supported.test(path)) {
-    const id = entries.length;
-    sources.set(id, source);
+    let bytes;
+    let identity;
     let info;
     let metadataError = '';
     try {
-      info = await metadata(source);
+      bytes = await sourceBytes(source);
+      identity = await contentId(bytes);
     } catch (error) {
-      // Keep the file discoverable; an indexing error must not hide it or stop
-      // other files being indexed. Loading it still uses the normal player.
-      info = { title: '', author: '', year: '', subtuneCount: null };
+      // Unreadable content has no identity; never merge it by path or metadata.
       metadataError = error.message;
-      unavailable++;
     }
-    const entry = { id, path, ...provenance, ...info, metadataError };
-    entry.search = [entry.title, entry.author, entry.year, entry.subtuneCount ?? '', path].join('\n').toLowerCase();
-    entries.push(entry);
+    const location = { path, ...provenance };
+    const playbackSource = source.zipEntry
+      ? { archive: source.archive, memberPath: source.memberPath, memberIndex: source.memberIndex } : source;
+    const duplicate = identities.get(identity);
+    if (duplicate) {
+      duplicate.locations.push(location);
+      duplicate.search += '\n' + path.toLowerCase();
+      sources.get(duplicate.id).locations.push({ path, source: playbackSource });
+      cachedView = undefined;
+    } else {
+      const id = entries.length;
+      try {
+        if (!bytes) throw new Error(metadataError);
+        info = metadata(bytes);
+      } catch (error) {
+        // Keep unreadable tracks discoverable without assigning a false identity.
+        info = { title: '', author: '', year: '', subtuneCount: null };
+        metadataError = error.message;
+        unavailable++;
+      }
+      const entry = { id, path, ...info, metadataError, locations: [location] };
+      entry.search = [entry.title, entry.author, entry.year, entry.subtuneCount ?? '', path].join('\n').toLowerCase();
+      entries.push(entry);
+      sources.set(id, { identity, locations: [{ path, source: playbackSource }] });
+      if (identity) identities.set(identity, entry);
+    }
   }
   if (performance.now() - lastPublish >= 100) publish();
   // Allow queries and read requests through even in mostly non-music folders.
@@ -160,9 +197,23 @@ self.onmessage = async ({ data }) => {
     publish();
   } else if (data.type === 'read') {
     try {
-      const source = sources.get(data.id);
-      if (!source) throw new Error('This collection entry is no longer available.');
-      const buffer = (await sourceBytes(source)).buffer;
+      const track = sources.get(data.id);
+      if (!track) throw new Error('This collection entry is no longer available.');
+      let buffer;
+      const errors = [];
+      for (const { path, source } of track.locations) {
+        try {
+          const bytes = await sourceBytes(source);
+          if (track.identity && await contentId(bytes) !== track.identity) {
+            throw new Error('Contents changed since indexing. Reselect the folder to index this version.');
+          }
+          buffer = bytes.buffer;
+          break;
+        } catch (error) {
+          errors.push(`${path}: ${error.message}`);
+        }
+      }
+      if (!buffer) throw new Error(`No source could be loaded:\n${errors.join('\n')}`);
       self.postMessage({ type: 'read', request: data.request, buffer }, [buffer]);
     } catch (error) {
       self.postMessage({ type: 'read', request: data.request, error: error.message });

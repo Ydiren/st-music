@@ -50,15 +50,18 @@ access when the browser provides it. Alternatively use **Select a folder
 available when direct folder access is unsupported.
 
 The scanner discovers `.sndh`, `.snd`, and `.ym` files in subfolders and inside
-`.zip` archives, ignoring extension case. Each result shows embedded title,
-composer, year, subtune count, and its source path. Archived tracks additionally
-show the archive path and full member path; both participate in search/sorting.
-Missing metadata is shown as Unknown; unreadable tracks remain listed with a
-warning.
+`.zip` archives, ignoring extension case. SHA-256 of the complete file bytes
+identifies duplicates across folders and archives: one library entry retains
+every source location, shown directly in its result. Different bytes stay
+separate even when title, composer, and other metadata match. Each result shows
+embedded title, composer, year, and subtune count. Archived locations show both
+archive and full member paths. Missing metadata is shown as Unknown; unreadable
+tracks remain listed with a warning and are not merged without a content hash.
 
 Search is case-insensitive and requires every whitespace-separated word to
-match somewhere in the title, composer, year, subtune count, or path. Sort by
-source path, title, composer, year, or subtune count, in either direction.
+match somewhere in the title, composer, year, subtune count, or any source path.
+Sort by the first discovered source path, title, composer, year, or subtune count,
+in either direction. Counts and pagination refer to unique tracks, not locations.
 Numeric portions sort naturally, missing values stay last in both directions,
 and ties use source path. Changing search or sort returns to the first page.
 Results update while indexing continues, with at most 100 matches per page.
@@ -66,16 +69,23 @@ Select a result to load it into the existing transport, then press Play.
 Browsing, searching, sorting, and indexing do not stop current playback;
 explicitly loading a different track does.
 
-Indexing and queries run in a dedicated Web Worker. It reads one file at a time
-and uses a separate AtariAudio instance to parse metadata without initializing
-or executing the music's replay code. Temporary file bytes and parser data are
-released after inspection; only metadata and source references are indexed.
-Selecting a track reads its bytes again for playback. ZIPs are read by byte
-ranges, not buffered as whole archives; music members are extracted individually
-for inspection and re-extracted on selection. Extracted bytes are discarded
-after use, not cached or written into persistent browser storage. The app does
-not upload music or retain the collection across visits. Reselect the folder
-after refreshing. Deduplication and catalog persistence remain separate features.
+Content hashing, metadata indexing, and queries run in a dedicated Web Worker,
+separate from the UI thread and audio renderer. It reads one file at a time and
+uses a separate AtariAudio instance to parse metadata without initializing or
+executing the music's replay code. Duplicate content is inspected only once.
+Temporary file bytes and parser data are released after inspection; only hashes,
+metadata, and source references are retained.
+
+Selecting a track tries its original locations in discovery order. Unreadable,
+missing, or changed sources are skipped; playback uses the first source whose
+bytes still match the indexed hash. If none is available, the error lists each
+source failure. Reselect the folder to index changed content. ZIPs are read by
+byte ranges, not buffered as whole archives; music members are extracted
+individually for inspection. Selection reopens the archive and extracts the
+member again. Compatible folder mode uses the browser-provided File snapshots;
+direct directory access re-reads current files. Extracted bytes are discarded,
+not cached or written into persistent storage. The app does not upload music or
+retain the collection across visits. Reselect the folder after refreshing.
 
 Nested ZIPs are not traversed. Password-protected members remain visible but
 cannot be played. Corrupt archives report their source paths and do not stop
@@ -95,12 +105,13 @@ engine memory capacity.
 - `player.js`: transport commands, position reporting, and smoothed output gain.
 - `app.js`, `index.html`, `style.css`: local loading, credits, and transport UI.
 - `collection.js`: folder selection, search/sort controls, paginated metadata
-  results, and handoff to the transport. Stable entry IDs retain source identity
-  after sorting; query revisions reject stale responses.
-- `collection-worker.js`: recursive discovery, AtariAudio metadata inspection,
-  cached filtering/sorting, and on-demand playback reads. Only the current page
-  is sent to the UI. Fallback relative paths are sent explicitly because
-  nonstandard File properties are not a reliable structured-cloning contract.
+  results, inspectable source locations, and handoff to the transport. Stable
+  entry IDs survive sorting; query revisions reject stale responses.
+- `collection-worker.js`: recursive discovery, SHA-256 content identity,
+  AtariAudio metadata inspection, cached filtering/sorting, and verified
+  multi-source playback reads. Only the current page is sent to the UI. Fallback
+  relative paths are sent explicitly because nonstandard File properties are
+  not a reliable structured-cloning contract.
 - `zip-archive.js`: range-based ZIP enumeration and bounded, CRC-checked member
   extraction, using zip.js 2.24.0 inside the existing collection worker.
 - `scripts/zip-assets.mjs`: copies the self-contained ZIP module and license
@@ -125,9 +136,9 @@ are required.
 ## Current scope and verification
 
 Playback supports numbered subtune selection and continuous looping, with a
-session-only searchable, sortable library of loose and ZIP-contained music.
-Deduplication, persistence, queue/duration policies, visualization, mute/solo, and
-offline app caching are not yet implemented.
+session-only searchable, sortable library of content-deduplicated loose and
+ZIP-contained music. Persistence, queue/duration policies, visualization,
+mute/solo, and offline app caching are not yet implemented.
 
 Browser smoke checks exercised Comic Bakery at 48 kHz through the actual
 AudioWorklet: non-silent varying PCM, pause position preservation, resume, zero
@@ -171,6 +182,15 @@ music and subtunes. Tests verified nested ZIP exclusion, recovery after a
 damaged track, FileList and real directory-handle paths, and a 390 px layout.
 Indexing preserved running audio/non-silent PCM and recorded no main-thread
 tasks over 50 ms. Browser-only fixtures were removed after verification.
+
+Content-deduplication checks in Chromium indexed 1,001 identical loose/ZIP
+locations as one entry alongside a byte-different track with identical metadata.
+All paths remained visible and the Unicode ZIP member path was searchable.
+Indexing preserved running audio and non-silent PCM. Real directory handles in
+temporary origin-private storage exercised deleted-source fallback, changed-byte
+rejection, ZIP fallback (including a preceding non-music member), all-sources-
+absent errors, and recovery when a source returned. Source rows were visually
+checked. Fixtures were supplied programmatically, not through native choosers.
 
 Run `npm test` for the ZIP regression suite (Emscripten is not needed for these
 tests). Independent fixtures cover stored/deflated members, Unicode names,
