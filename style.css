@@ -109,6 +109,7 @@ input::file-selector-button { margin-right: .8rem; }
 .reference-row { display: flex; align-items: center; flex-wrap: wrap; gap: .85rem 1.25rem; padding-top: 1.5rem; border-top: 1px solid var(--border); }
 .reference-note { font-size: .65rem; color: var(--muted); }
 .error { margin: 1rem 0 0; padding: 1rem 1.25rem; border: 1px solid #bc786b; border-radius: 6px; color: #ffd1c6; background: #342523; line-height: 1.6; font-size: .875rem; overflow-wrap: anywhere; }
+#collection-error { white-space: pre-line; }
 [hidden] { display: none !important; }
 footer { color: var(--muted); font-size: .65rem; line-height: 1.7; text-align: center; padding-top: 1.75rem; }
 
@@ -129,7 +130,7 @@ footer { color: var(--muted); font-size: .65rem; line-height: 1.7; text-align: c
 .collection-track-title, .collection-track-metadata, .collection-track-path, .collection-track-warning { display: block; }
 .collection-track-title { font-size: .9rem; }
 .collection-track-metadata { margin-top: .35rem; font-size: .7rem; color: var(--muted); }
-.collection-track-path { margin-top: .4rem; font-size: .65rem; color: var(--muted); }
+.collection-track-path { margin-top: .4rem; font-size: .65rem; color: var(--muted); white-space: pre-line; }
 .collection-track-warning { margin-top: .35rem; color: #ffd1c6; font-size: .7rem; }
 
 @media (max-width: 440px) {
